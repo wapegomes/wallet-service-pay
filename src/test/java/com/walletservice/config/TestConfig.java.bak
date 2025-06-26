@@ -1,0 +1,69 @@
+package com.walletservice.config;
+
+import com.walletservice.domain.Transaction;
+import com.walletservice.domain.Wallet;
+import com.walletservice.repository.TransactionRepository;
+import com.walletservice.repository.WalletRepository;
+import com.walletservice.service.WalletService;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Profile;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Configuration
+@Profile("test")
+public class TestConfig {
+
+    @Bean
+    @Primary
+    public WalletRepository walletRepository() {
+        return new InMemoryWalletRepository();
+    }
+
+    @Bean
+    @Primary
+    public TransactionRepository transactionRepository() {
+        return new InMemoryTransactionRepository();
+    }
+
+    @Bean
+    public WalletService walletService() {
+        return new WalletService(walletRepository(), transactionRepository());
+    }
+
+    private static class InMemoryWalletRepository implements WalletRepository {
+        private final java.util.Map<String, Wallet> wallets = new java.util.HashMap<>();
+
+        @Override
+        public Wallet save(Wallet wallet) {
+            wallets.put(wallet.getUserId(), wallet);
+            return wallet;
+        }
+
+        @Override
+        public Wallet findByUserId(String userId) {
+            return wallets.get(userId);
+        }
+    }
+
+    private static class InMemoryTransactionRepository implements TransactionRepository {
+        private final java.util.List<Transaction> transactions = new java.util.ArrayList<>();
+
+        @Override
+        public Transaction save(Transaction transaction) {
+            transactions.add(transaction);
+            return transaction;
+        }
+
+        @Override
+        public java.util.List<Transaction> findBySourceUserId(String userId) {
+            return transactions.stream()
+                    .filter(t -> t.getSourceUserId().equals(userId))
+                    .toList();
+        }
+    }
+}

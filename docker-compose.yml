@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: wallet-service-app
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/wallet_service
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
+      # Configurações da JVM
+      - JAVA_OPTS=-Xms256m -Xmx512m -XX:+UseG1GC
+      # Configurações de segurança
+      - WALLET_APP_JWT_SECRET=walletServiceSecretKey123456789012345678901234567890
+      - WALLET_APP_JWT_EXPIRATION_MS=86400000
+      # Configurações do Resilience4j
+      - RESILIENCE4J_CIRCUITBREAKER_INSTANCES_WALLETSERVICE_FAILURERATE_THRESHOLD=50
+      - RESILIENCE4J_CIRCUITBREAKER_INSTANCES_WALLETSERVICE_WAITDURATION_INOPENSTATESECONDS=5
+      - RESILIENCE4J_CIRCUITBREAKER_INSTANCES_WALLETSERVICE_SLIDINGWINDOWSIZE=10
+      - RESILIENCE4J_CIRCUITBREAKER_INSTANCES_WALLETSERVICE_MINIMUMNUMBEROFCALLS=5
+      - RESILIENCE4J_CIRCUITBREAKER_INSTANCES_WALLETSERVICE_PERMITTEDNUMBEROFCALLSINHALFPENSTATE=3
+      - RESILIENCE4J_CIRCUITBREAKER_INSTANCES_WALLETSERVICE_AUTOMATICTRANSITIONFROMOPENTOHALOPENSTATE=true
+      - RESILIENCE4J_TIMELIMITER_INSTANCES_WALLETSERVICE_TIMEOUTDURATION=3S
+      - RESILIENCE4J_RETRY_INSTANCES_WALLETSERVICE_MAXATTEMPTS=3
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+      # Nota: O endpoint /actuator/health está configurado como público no SecurityConfig
+    networks:
+      - wallet-network
+
+  db:
+    image: postgres:14-alpine
+    container_name: wallet-service-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=wallet_service
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wallet-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: wallet-service-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --save 60 1 --loglevel warning --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wallet-network
+
+networks:
+  wallet-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
