@@ -24,24 +24,101 @@ A Spring Boot service that manages users' money with operations for deposit, wit
 ### Option 2: Docker Execution (Recommended)
 
 1. Clone the repository
-2. Run the Docker Compose command to start the application and database:
+2. Run the Docker Compose command to start the application and all required services:
    ```bash
-   docker-compose up -d
+   docker-compose up -d --build
    ```
 
-This will start both the Spring Boot application and the PostgreSQL database in Docker containers. The application will be available at http://localhost:8080.
+This will start the following containers:
+- Spring Boot application
+- PostgreSQL database
+- Redis cache
 
-To stop the containers:
-   ```bash
-   docker-compose down
-   ```
+The application will be available at http://localhost:8080.
 
-To view the application logs:
-   ```bash
-   docker-compose logs -f app
-   ```
+#### Useful Docker Commands
 
-**Note**: PostgreSQL data is persisted in a Docker volume, so it won't be lost when the containers are stopped.
+```bash
+# View status of all containers
+docker-compose ps
+
+# View logs of the application
+docker-compose logs -f app
+
+# View logs of the database
+docker-compose logs -f db
+
+# View logs of Redis
+docker-compose logs -f redis
+
+# Stop all containers
+docker-compose down
+
+# Stop and remove all containers and volumes (clean state)
+docker-compose down -v
+```
+
+**Note**: PostgreSQL and Redis data are persisted in Docker volumes, so they won't be lost when the containers are stopped unless you use the `-v` flag.
+
+## Testing the API
+
+### Using the Test Script
+
+A test script is provided to quickly verify all the basic wallet operations. After starting the application with Docker, you can run:
+
+```bash
+./test-wallet-api.sh
+```
+
+This script will:
+1. Create a user and authenticate
+2. Create a wallet
+3. Check the initial balance
+4. Make a deposit
+5. Check the balance after deposit
+6. Make a withdrawal
+7. Check the balance after withdrawal
+8. Create another user and wallet
+9. Make a transfer between wallets
+10. Check the balances of both users after the transfer
+
+### Manual Testing
+
+You can also test the API manually using curl or any API client like Postman:
+
+1. **Register a user**:
+```bash
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"username":"testuser","email":"test@example.com","password":"password123","roles":["USER"]}' \
+  http://localhost:8080/api/auth/signup
+```
+
+2. **Login to get a JWT token**:
+```bash
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"username":"testuser","password":"password123"}' \
+  http://localhost:8080/api/auth/signin
+```
+
+3. **Create a wallet** (use the token from the previous step):
+```bash
+curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{"idUsuario":"testuser"}' \
+  http://localhost:8080/api/wallets
+```
+
+4. **Make a deposit**:
+```bash
+curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{"idUsuario":"testuser","valor":100.00}' \
+  http://localhost:8080/api/wallets/deposit
+```
+
+5. **Check balance**:
+```bash
+curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  http://localhost:8080/api/wallets/testuser/balance
+```
 
 ## API Documentation
 
